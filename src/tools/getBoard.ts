@@ -3,8 +3,8 @@ import { VentoClient } from "../vento/client.js";
 import { Logger } from "pino";
 
 export function createGetBoardTool(
-  ventoClient: VentoClient,
-  logger: Logger
+  _ventoClient: VentoClient,
+  _logger: Logger
 ): Tool {
   return {
     name: "vento_get_board",
@@ -49,7 +49,7 @@ export async function handleGetBoard(
     if (valueCards.length > 0) {
       details += `## Sensor Values (${valueCards.length})\n`;
       valueCards.forEach((card) => {
-        const valueCard = card as any;
+        const valueCard = card as unknown as Record<string, unknown>;
         details += `- **${card.name}** (ID: ${card.id})`;
         if (valueCard.value !== undefined) {
           details += `: ${valueCard.value}`;
@@ -68,7 +68,7 @@ export async function handleGetBoard(
     if (actionCards.length > 0) {
       details += `## Available Actions (${actionCards.length})\n`;
       actionCards.forEach((card) => {
-        const actionCard = card as any;
+        const actionCard = card as unknown as Record<string, unknown>;
         details += `- **${card.name}** (ID: ${card.id})`;
         if (actionCard.params) {
           details += ` - Params: ${JSON.stringify(actionCard.params)}`;

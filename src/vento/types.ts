@@ -51,8 +51,14 @@ export interface AgentResponse {
   }>;
 }
 
-export interface VentoError {
-  message: string;
+export class VentoError extends Error {
   code?: string;
   details?: unknown;
+
+  constructor(message: string, code?: string, details?: unknown) {
+    super(message);
+    this.name = "VentoError";
+    this.code = code;
+    this.details = details;
+  }
 }

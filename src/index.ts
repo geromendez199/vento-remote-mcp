@@ -24,6 +24,8 @@ const logger = pino(
 async function startStdioServer(): Promise<void> {
   try {
     validateConfig();
+    const config = getConfig();
+    logger.level = config.LOG_LEVEL;
     logger.info("Starting Vento MCP server with stdio transport");
 
     const ventoClient = new VentoClient(logger);
@@ -47,74 +49,71 @@ async function startHttpServer(): Promise<void> {
     const app: Application = express();
     app.use(express.json());
 
-    app.get("/health", (req, res) => {
+    app.get("/health", (_req, res) => {
       res.json({ status: "ok", timestamp: new Date().toISOString() });
     });
 
     const ventoClient = new VentoClient(logger);
-
     const authMiddleware = createAuthMiddleware(logger);
+    // ventoClient is used for future HTTP-based tool execution
+    void ventoClient;
 
-    app.post(
-      "/mcp",
-      authMiddleware,
-      async (req, res) => {
-        try {
-          const { jsonrpc, id, method, params } = req.body;
+    app.post("/mcp", authMiddleware, async (req, res) => {
+      try {
+        const { jsonrpc, id, method } = req.body;
 
-          if (jsonrpc !== "2.0") {
-            return res.status(400).json({ error: "Invalid JSON-RPC version" });
-          }
+        if (jsonrpc !== "2.0") {
+          return res.status(400).json({ error: "Invalid JSON-RPC version" });
+        }
 
-          const mcpServer = createMcpServer(logger, ventoClient);
+        // MCP Protocol 2024-11-05 JSON-RPC endpoint
+        if (method === "initialize") {
+          const result = {
+            protocolVersion: "2024-11-05",
+            capabilities: {
+              tools: {},
+            },
+            serverInfo: {
+              name: "vento-remote",
+              version: "0.1.0",
+            },
+          };
 
-          if (method === "initialize") {
-            const result = await mcpServer.initialize({
-              protocolVersion: params?.protocolVersion || "2024-11-05",
-              capabilities: params?.capabilities || {},
-              clientInfo: params?.clientInfo || {},
-            });
-
-            return res.json({
-              jsonrpc: "2.0",
-              id,
-              result,
-            });
-          }
-
-          logger.warn({ method }, "Unknown MCP method");
-          return res.status(400).json({
+          return res.json({
             jsonrpc: "2.0",
             id,
-            error: { code: -32601, message: "Method not found" },
-          });
-        } catch (error) {
-          logger.error({ error }, "Error handling MCP request");
-          return res.status(500).json({
-            jsonrpc: "2.0",
-            id: req.body.id,
-            error: {
-              code: -32603,
-              message: "Internal error",
-            },
+            result,
           });
         }
-      }
-    );
 
-    app.get(
-      "/info",
-      createOptionalAuthMiddleware(logger),
-      (req, res) => {
-        res.json({
-          name: "vento-remote",
-          version: "0.1.0",
-          description:
-            "Remote MCP connector for Vento - AI control and automation platform",
-          ventoUrl: config.VENTO_API_URL,
+        logger.warn({ method }, "Unknown MCP method");
+        return res.status(400).json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32601, message: "Method not found" },
+        });
+      } catch (error) {
+        logger.error({ error }, "Error handling MCP request");
+        return res.status(500).json({
+          jsonrpc: "2.0",
+          id: req.body?.id,
+          error: {
+            code: -32603,
+            message: "Internal error",
+          },
         });
       }
-    );
+    });
+
+    app.get("/info", createOptionalAuthMiddleware(logger), (_req, res) => {
+      res.json({
+        name: "vento-remote",
+        version: "0.1.0",
+        description:
+          "Remote MCP connector for Vento - AI control and automation platform",
+        ventoUrl: config.VENTO_API_URL,
+      });
+    });
 
     app.use(
       (

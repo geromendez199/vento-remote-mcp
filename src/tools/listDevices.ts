@@ -3,8 +3,8 @@ import { VentoClient } from "../vento/client.js";
 import { Logger } from "pino";
 
 export function createListDevicesTool(
-  ventoClient: VentoClient,
-  logger: Logger
+  _ventoClient: VentoClient,
+  _logger: Logger
 ): Tool {
   return {
     name: "vento_list_devices",

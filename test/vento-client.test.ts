@@ -8,6 +8,9 @@ describe("VentoClient", () => {
   beforeEach(() => {
     process.env.VENTO_API_URL = "http://localhost:8000";
     process.env.VENTO_TOKEN = "test-token";
+    process.env.MCP_AUTH_TOKEN = "test-mcp-token-very-long-string-to-be-at-least-32-chars";
+    // Clear any cached config
+    vi.resetModules();
     vi.clearAllMocks();
   });
 

@@ -5,7 +5,7 @@ import {
   Device,
   Agent,
   AgentResponse,
-  VentoError,
+  VentoError as VentoErrorClass,
 } from "./types.js";
 import { Logger } from "pino";
 
@@ -46,24 +46,23 @@ export class VentoClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const error: VentoError = {
-          message: `Vento API error: ${response.status} ${response.statusText}`,
-          code: `HTTP_${response.status}`,
-          details: errorData,
-        };
-        throw error;
+        throw new VentoErrorClass(
+          `Vento API error: ${response.status} ${response.statusText}`,
+          `HTTP_${response.status}`,
+          errorData
+        );
       }
 
       return (await response.json()) as T;
     } catch (error) {
-      if (error instanceof VentoError) {
+      if (error instanceof VentoErrorClass) {
         throw error;
       }
-      const ventoError: VentoError = {
-        message: `Failed to connect to Vento API at ${url}`,
-        details: error instanceof Error ? error.message : String(error),
-      };
-      throw ventoError;
+      throw new VentoErrorClass(
+        `Failed to connect to Vento API at ${url}`,
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   }
 

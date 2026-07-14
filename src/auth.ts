@@ -3,13 +3,14 @@ import { getConfig } from "./config.js";
 import { Logger } from "pino";
 
 export function createAuthMiddleware(logger: Logger) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const config = getConfig();
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
       logger.warn({ path: req.path }, "Missing authorization header");
-      return res.status(401).json({ error: "Missing authorization header" });
+      res.status(401).json({ error: "Missing authorization header" });
+      return;
     }
 
     const parts = authHeader.split(" ");
@@ -18,15 +19,17 @@ export function createAuthMiddleware(logger: Logger) {
         { path: req.path, authHeader: "***" },
         "Invalid authorization header format"
       );
-      return res
+      res
         .status(401)
         .json({ error: "Invalid authorization header format" });
+      return;
     }
 
     const token = parts[1];
     if (token !== config.MCP_AUTH_TOKEN) {
       logger.warn({ path: req.path }, "Invalid auth token");
-      return res.status(401).json({ error: "Invalid auth token" });
+      res.status(401).json({ error: "Invalid auth token" });
+      return;
     }
 
     next();
@@ -34,7 +37,7 @@ export function createAuthMiddleware(logger: Logger) {
 }
 
 export function createOptionalAuthMiddleware(logger: Logger) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const authHeader = req.headers.authorization;
 
     if (authHeader) {
@@ -43,7 +46,8 @@ export function createOptionalAuthMiddleware(logger: Logger) {
         const config = getConfig();
         if (parts[1] !== config.MCP_AUTH_TOKEN) {
           logger.warn({ path: req.path }, "Invalid auth token");
-          return res.status(401).json({ error: "Invalid auth token" });
+          res.status(401).json({ error: "Invalid auth token" });
+          return;
         }
       }
     }

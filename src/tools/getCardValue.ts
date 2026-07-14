@@ -3,8 +3,8 @@ import { VentoClient } from "../vento/client.js";
 import { Logger } from "pino";
 
 export function createGetCardValueTool(
-  ventoClient: VentoClient,
-  logger: Logger
+  _ventoClient: VentoClient,
+  _logger: Logger
 ): Tool {
   return {
     name: "vento_get_card_value",
@@ -35,17 +35,18 @@ export async function handleGetCardValue(
 ): Promise<TextContent> {
   try {
     const card = await ventoClient.getCardValue(boardId, cardId);
+    const cardData = card as unknown as Record<string, unknown>;
 
     let text = `**${card.name}**\n`;
     if (card.value !== undefined) {
       text += `Value: ${card.value}`;
-      if ((card as any).unit) {
-        text += ` ${(card as any).unit}`;
+      if (cardData.unit) {
+        text += ` ${cardData.unit}`;
       }
       text += "\n";
     }
-    if ((card as any).lastUpdated) {
-      text += `Last Updated: ${(card as any).lastUpdated}\n`;
+    if (cardData.lastUpdated) {
+      text += `Last Updated: ${cardData.lastUpdated}\n`;
     }
 
     return {
