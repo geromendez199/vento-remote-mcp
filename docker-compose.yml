@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  vento:
+    image: ghcr.io/protofy-xyz/protofy:latest
+    ports:
+      - "8000:8000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: "file:./data.db"
+      MQTT_BROKER_PORT: "1883"
+    volumes:
+      - vento-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  connector:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      LOG_LEVEL: debug
+      MCP_AUTH_TOKEN: "test-token-change-me-in-production-at-least-32-chars!"
+      VENTO_API_URL: "http://vento:8000"
+      VENTO_TOKEN: "your-vento-token-here"
+      MCP_TRANSPORT: "http"
+    depends_on:
+      vento:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  vento-data:
+
+networks:
+  default:
+    name: vento-network
