@@ -1,0 +1,33 @@
+[Unit]
+Description=Vento Remote MCP Connector - Claude AI Integration
+Documentation=https://github.com/geromendez199/vento-remote-mcp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vento-mcp
+WorkingDirectory=/opt/vento-remote-mcp
+EnvironmentFile=/opt/vento-remote-mcp/.env
+
+# Security hardening
+PrivateTmp=yes
+NoNewPrivileges=true
+ReadWritePaths=/opt/vento-remote-mcp
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Process
+ExecStart=/usr/bin/node /opt/vento-remote-mcp/dist/index.js
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vento-remote-mcp
+
+[Install]
+WantedBy=multi-user.target
