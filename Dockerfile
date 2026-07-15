@@ -2,13 +2,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json yarn.lock* package-lock.json* ./
+COPY package.json package-lock.json* ./
 
-RUN npm ci --only=production || npm install --only=production
+RUN npm ci
 
 COPY . .
 
 RUN npm run build
+
+RUN npm ci --only=production
 
 FROM node:20-alpine
 
