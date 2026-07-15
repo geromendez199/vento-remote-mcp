@@ -1,0 +1,26 @@
+services:
+  vento-remote-mcp:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - MCP_TRANSPORT=http
+      - LOG_LEVEL=info
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - VENTO_API_URL=${VENTO_API_URL:-http://host.docker.internal:8000}
+      - VENTO_TOKEN=${VENTO_TOKEN}
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=60
+      # Uncomment to make the demo read-only (hides vento_run_action):
+      # - ALLOW_DESTRUCTIVE_TOOLS=false
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

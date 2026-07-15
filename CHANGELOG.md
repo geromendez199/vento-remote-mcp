@@ -15,6 +15,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Board state caching and subscriptions
 - Rate limiting metrics and monitoring
 - Prometheus metrics export
+- Persistent OAuth token storage with encryption
+- OAuth scope management UI
+- Token refresh before expiration
+- OpenTelemetry distributed tracing
+- Streamable HTTP transport (MCP SDK)
+- Helm chart and AWS SAM templates
+
+## [0.2.0] - 2026-07-15
+
+### Fixed
+- **MCP tool discovery**: the server never registered a `tools/list` handler
+  and did not declare the `tools` capability — MCP clients could not discover
+  any tools. Both are now implemented on stdio and HTTP transports.
+- **MCP result shape**: `tools/call` returned a bare `TextContent` instead of
+  the spec-compliant `{ content: [...] }` result envelope.
+- **HTTP transport was initialize-only**: `/mcp` now implements the full
+  JSON-RPC surface (`initialize`, `notifications/initialized`, `ping`,
+  `tools/list`, `tools/call`).
+- **Timing-unsafe auth**: bearer token comparison switched from `!==` to
+  `crypto.timingSafeEqual` over SHA-256 digests.
+- `npm test` no longer starts vitest in watch mode (`vitest run`; watch moved
+  to `npm run test:watch`).
+
+### Added
+- OAuth 2.0 authorization flow (`/auth/vento/*` endpoints) with session
+  tokens, CSRF-protected state, and revocation
+- Prometheus metrics at `/metrics` (request duration histogram, Vento API
+  call counters, tool execution counters, auth failures, rate-limited
+  requests, cache hit/miss, in-flight gauge)
+- Per-token rate limiting with burst control
+  (`RATE_LIMIT_BURST_PER_SECOND`), keyed by token hash
+- Board read caching with action-driven invalidation (`CACHE_TTL_SECONDS`)
+- Multiple Vento instances via `VENTO_INSTANCES` JSON; tools accept an
+  optional `instance` argument
+- Tool permission policy: `ALLOWED_TOOLS` allowlist and
+  `ALLOW_DESTRUCTIVE_TOOLS` read-only gate; tools carry danger levels
+- Security headers middleware (HSTS, nosniff, DENY framing, CSP, no-store)
+  with `CORS_ORIGINS` allowlist
+- `X-Request-Id` correlation on all HTTP requests and logs
+- Readiness endpoint `/health` (pings Vento, reports latency) and liveness
+  endpoint `/health/live`
+- 15-second timeout on all Vento API requests; path params URL-encoded
+- Deploy configs: `render.yaml` (Render), `fly.toml` (Fly.io), Railway button
+- Smart-home end-to-end example (`examples/smart-home/`)
+- Docs: `docs/ARCHITECTURE.md`, `docs/TROUBLESHOOTING.md`,
+  `docs/ANTHROPIC_SUBMISSION.md`, `FINDINGS.md` audit report
+- Test suites for cache, rate limiter, permissions, instance registry,
+  timing-safe auth, and the shared tool executor (5 → 42 tests)
 
 ## [0.1.0] - 2024-01-15
 

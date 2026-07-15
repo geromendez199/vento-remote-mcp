@@ -186,6 +186,30 @@ ReadWritePaths=/opt/vento-remote-mcp
 VENTO_API_URL=https://your-vento-instance.com
 ```
 
+### Mutual TLS (Enterprise)
+
+Native in-process mTLS is not implemented. The recommended (and more
+operationally robust) pattern is to terminate mTLS at a reverse proxy in
+front of the connector:
+
+```nginx
+server {
+  listen 443 ssl;
+  ssl_certificate     /etc/nginx/certs/server.crt;
+  ssl_certificate_key /etc/nginx/certs/server.key;
+  ssl_client_certificate /etc/nginx/certs/ca.crt;
+  ssl_verify_client on;   # require a valid client certificate
+
+  location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header X-Request-Id $request_id;
+  }
+}
+```
+
+Cloudflare Tunnel and Caddy offer equivalent client-certificate enforcement.
+Keep bearer auth enabled behind the proxy for defense in depth.
+
 ### Known Limitations
 
 1. **Action Execution**: Once authenticated to Claude, all actions are executable
