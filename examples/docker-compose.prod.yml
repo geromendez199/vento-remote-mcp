@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  # Vento Remote MCP Connector
+  vento-mcp:
+    image: ghcr.io/geromendez199/vento-remote-mcp:0.2.0
+    container_name: vento-mcp
+    restart: unless-stopped
+    networks:
+      - vento-network
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+      LOG_LEVEL: info
+      MCP_TRANSPORT: http
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN}
+      VENTO_API_URL: ${VENTO_API_URL}
+      VENTO_TOKEN: ${VENTO_TOKEN}
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_REQUESTS_PER_MINUTE: "60"
+      RATE_LIMIT_BURST_PER_SECOND: "10"
+      CACHE_TTL_SECONDS: "30"
+      OAUTH_ENABLED: "true"
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-}
+      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-}
+      ALLOW_DESTRUCTIVE_TOOLS: "true"
+      CORS_ORIGINS: "https://claude.ai"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Don't expose port directly - use nginx reverse proxy
+    expose:
+      - "3000"
+
+  # Nginx reverse proxy with HTTPS
+  nginx:
+    image: nginx:latest
+    container_name: vento-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - vento-network
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./www:/var/www/certbot:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - vento-mcp
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Certbot for automatic Let's Encrypt certificate renewal
+  certbot:
+    image: certbot/certbot:latest
+    container_name: vento-certbot
+    restart: unless-stopped
+    networks:
+      - vento-network
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - ./www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $!; done;'"
+    depends_on:
+      - nginx
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+networks:
+  vento-network:
+    driver: bridge
+
+volumes:
+  nginx-logs:
+    driver: local

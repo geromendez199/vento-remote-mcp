@@ -7,11 +7,10 @@
     "numReplicas": 1,
     "startCommand": "node dist/index.js",
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 5
+    "restartPolicyMaxRetries": 5,
+    "healthcheckPath": "/health/live",
+    "healthcheckTimeout": 10
   },
-  "plugins": [
-    "postgres"
-  ],
   "variables": {
     "PORT": {
       "description": "Server port",
@@ -24,6 +23,10 @@
     "LOG_LEVEL": {
       "description": "Log level (debug, info, warn, error)",
       "value": "info"
+    },
+    "MCP_TRANSPORT": {
+      "description": "Transport type (http or stdio)",
+      "value": "http"
     },
     "MCP_AUTH_TOKEN": {
       "description": "Strong random token for Claude → Connector auth (32+ chars). Generate: openssl rand -hex 32",
@@ -39,12 +42,48 @@
       "value": ""
     },
     "RATE_LIMIT_ENABLED": {
-      "description": "Enable rate limiting",
+      "description": "Enable per-token rate limiting",
       "value": "true"
     },
     "RATE_LIMIT_REQUESTS_PER_MINUTE": {
-      "description": "Rate limit requests per minute",
+      "description": "Max requests per minute per token",
       "value": "60"
+    },
+    "RATE_LIMIT_BURST_PER_SECOND": {
+      "description": "Max requests per second (burst window)",
+      "value": "10"
+    },
+    "CACHE_TTL_SECONDS": {
+      "description": "Board read cache TTL in seconds",
+      "value": "30"
+    },
+    "OAUTH_ENABLED": {
+      "description": "Enable OAuth 2.1 PKCE flow",
+      "value": "true"
+    },
+    "OAUTH_CLIENT_ID": {
+      "description": "OAuth client ID from Vento (optional, for directory submission)",
+      "value": ""
+    },
+    "OAUTH_CLIENT_SECRET": {
+      "description": "OAuth client secret from Vento (optional, for directory submission)",
+      "value": ""
+    },
+    "OAUTH_REDIRECT_URI": {
+      "description": "OAuth redirect URI (e.g., https://your-railway-url.up.railway.app/auth/vento/callback)",
+      "value": ""
+    },
+    "ALLOW_DESTRUCTIVE_TOOLS": {
+      "description": "Allow action execution (vento_run_action, vento_send_to_agent). Set false for read-only",
+      "value": "true"
+    },
+    "ALLOWED_TOOLS": {
+      "description": "CSV of allowed tools. Leave empty to allow all (subject to ALLOW_DESTRUCTIVE_TOOLS)",
+      "value": ""
+    },
+    "CORS_ORIGINS": {
+      "description": "CSV of allowed CORS origins",
+      "value": "https://claude.ai"
     }
   }
 }

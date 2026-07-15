@@ -1,0 +1,56 @@
+# Systemd service file for Vento Remote MCP Connector
+# Installation:
+#   1. Copy to: sudo cp vento-remote-mcp.service /etc/systemd/system/
+#   2. Create user: sudo useradd -r -s /bin/false vento-mcp
+#   3. Set permissions: sudo chown -R vento-mcp:vento-mcp /opt/vento-remote-mcp
+#   4. Create .env: sudo nano /opt/vento-remote-mcp/.env
+#   5. Enable: sudo systemctl daemon-reload && sudo systemctl enable vento-remote-mcp
+#   6. Start: sudo systemctl start vento-remote-mcp
+#   7. Status: sudo systemctl status vento-remote-mcp
+#   8. Logs: sudo journalctl -u vento-remote-mcp -f
+
+[Unit]
+Description=Vento Remote MCP Connector
+Documentation=https://github.com/geromendez199/vento-remote-mcp
+After=network.target
+StartLimitIntervalSec=0
+StartLimitBurst=0
+
+[Service]
+Type=simple
+User=vento-mcp
+Group=vento-mcp
+WorkingDirectory=/opt/vento-remote-mcp
+
+# Load environment variables from .env file
+EnvironmentFile=/opt/vento-remote-mcp/.env
+
+# Service execution
+ExecStart=/usr/bin/node /opt/vento-remote-mcp/dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Output and logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=vento-mcp
+StandardOutputAdditionalFD=1
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/vento-remote-mcp
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

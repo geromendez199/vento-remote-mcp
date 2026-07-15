@@ -1,12 +1,33 @@
 import { pino } from 'pino';
+import crypto from 'crypto';
 
 const logger = pino();
 
 export interface OAuthConfig {
   ventoApiUrl: string;
   clientId: string;
-  clientSecret: string;
+  clientSecret?: string;
   redirectUri: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type: string;
+}
+
+export interface StoredToken {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  obtainedAt: number;
+}
+
+export function generatePKCEChallenge(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  return { codeVerifier, codeChallenge };
 }
 
 export class VentoOAuthClient {
@@ -16,32 +37,44 @@ export class VentoOAuthClient {
     this.config = config;
   }
 
-  getAuthorizationUri(state: string, scopes: string[] = ['read:boards', 'write:actions']): string {
+  getAuthorizationUri(
+    state: string,
+    codeChallenge: string,
+    scopes: string[] = ['read:boards', 'write:actions']
+  ): string {
     const params = new URLSearchParams({
       client_id: this.config.clientId,
       redirect_uri: this.config.redirectUri,
       response_type: 'code',
       scope: scopes.join(' '),
       state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
     });
 
     return `${this.config.ventoApiUrl}/api/oauth/authorize?${params.toString()}`;
   }
 
-  async getToken(authorizationCode: string): Promise<string> {
+  async getToken(authorizationCode: string, codeVerifier: string): Promise<TokenResponse> {
     try {
+      const body: Record<string, string> = {
+        grant_type: 'authorization_code',
+        code: authorizationCode,
+        client_id: this.config.clientId,
+        redirect_uri: this.config.redirectUri,
+        code_verifier: codeVerifier,
+      };
+
+      if (this.config.clientSecret) {
+        body.client_secret = this.config.clientSecret;
+      }
+
       const response = await fetch(`${this.config.ventoApiUrl}/api/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          code: authorizationCode,
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-          redirect_uri: this.config.redirectUri,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -50,45 +83,60 @@ export class VentoOAuthClient {
         throw new Error(`Token request failed: ${response.statusText}`);
       }
 
-      const tokenData = (await response.json()) as { access_token?: string };
+      const tokenData = (await response.json()) as Partial<TokenResponse>;
       if (!tokenData.access_token) {
         throw new Error('No access token in response');
       }
 
-      logger.info('Successfully obtained OAuth token from Vento');
-      return tokenData.access_token;
+      logger.info('Successfully obtained OAuth 2.1 token from Vento');
+      return {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type || 'Bearer',
+      };
     } catch (error) {
       logger.error({ error }, 'Failed to obtain OAuth token');
       throw error;
     }
   }
 
-  async refreshToken(refreshToken: string): Promise<string> {
+  async refreshToken(refreshToken: string): Promise<TokenResponse> {
     try {
+      const body: Record<string, string> = {
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: this.config.clientId,
+      };
+
+      if (this.config.clientSecret) {
+        body.client_secret = this.config.clientSecret;
+      }
+
       const response = await fetch(`${this.config.ventoApiUrl}/api/oauth/token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         throw new Error('Token refresh failed');
       }
 
-      const tokenData = (await response.json()) as { access_token?: string };
+      const tokenData = (await response.json()) as Partial<TokenResponse>;
       if (!tokenData.access_token) {
         throw new Error('No access token in refresh response');
       }
 
       logger.info('Successfully refreshed OAuth token');
-      return tokenData.access_token;
+      return {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type || 'Bearer',
+      };
     } catch (error) {
       logger.error({ error }, 'Failed to refresh OAuth token');
       throw error;
@@ -97,13 +145,13 @@ export class VentoOAuthClient {
 }
 
 export class TokenStore {
-  private tokens: Map<string, { token: string; expiresAt?: number }> = new Map();
+  private tokens: Map<string, StoredToken> = new Map();
 
-  set(key: string, token: string, expiresAt?: number): void {
-    this.tokens.set(key, { token, expiresAt });
+  set(key: string, token: StoredToken): void {
+    this.tokens.set(key, { ...token, obtainedAt: Date.now() });
   }
 
-  get(key: string): string | null {
+  get(key: string): StoredToken | null {
     const stored = this.tokens.get(key);
     if (!stored) return null;
 
@@ -112,7 +160,14 @@ export class TokenStore {
       return null;
     }
 
-    return stored.token;
+    return stored;
+  }
+
+  shouldRefresh(key: string): boolean {
+    const stored = this.tokens.get(key);
+    if (!stored || !stored.expiresAt) return false;
+    const expiresIn = stored.expiresAt - Date.now();
+    return expiresIn < 5 * 60 * 1000; // Refresh if expires in < 5 minutes
   }
 
   delete(key: string): void {

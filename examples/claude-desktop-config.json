@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vento": {
+      "url": "https://your-connector-url.com",
+      "auth": {
+        "type": "bearer",
+        "token": "YOUR_MCP_AUTH_TOKEN"
+      }
+    }
+  }
+}

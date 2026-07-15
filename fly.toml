@@ -1,5 +1,11 @@
 # Fly.io configuration for Vento Remote MCP Connector
-# Deploy: fly launch --copy-config && fly secrets set MCP_AUTH_TOKEN=... VENTO_API_URL=... VENTO_TOKEN=... && fly deploy
+# Deploy:
+#   1. fly launch --copy-config
+#   2. fly secrets set MCP_AUTH_TOKEN=<generated-token>
+#   3. fly secrets set VENTO_API_URL=<your-vento-url>
+#   4. fly secrets set VENTO_TOKEN=<your-vento-token>
+#   5. fly secrets set OAUTH_CLIENT_ID=<optional> OAUTH_CLIENT_SECRET=<optional>
+#   6. fly deploy
 
 app = "vento-remote-mcp"
 primary_region = "eze"
@@ -14,6 +20,11 @@ primary_region = "eze"
   MCP_TRANSPORT = "http"
   RATE_LIMIT_ENABLED = "true"
   RATE_LIMIT_REQUESTS_PER_MINUTE = "60"
+  RATE_LIMIT_BURST_PER_SECOND = "10"
+  CACHE_TTL_SECONDS = "30"
+  OAUTH_ENABLED = "true"
+  ALLOW_DESTRUCTIVE_TOOLS = "true"
+  CORS_ORIGINS = "https://claude.ai"
 
 [http_service]
   internal_port = 3000
@@ -28,6 +39,13 @@ primary_region = "eze"
     grace_period = "10s"
     method = "GET"
     path = "/health/live"
+
+  [[http_service.checks]]
+    interval = "60s"
+    timeout = "10s"
+    grace_period = "30s"
+    method = "GET"
+    path = "/health"
 
 [[vm]]
   memory = "256mb"
