@@ -16,10 +16,10 @@
 <details>
 <summary><b>Deploy on other platforms</b></summary>
 
-- [Railway](#railway) (1-click) ⭐ Easiest
+- [Railway](#railway) (1-click, `railway.json`) ⭐ Easiest
+- [Render](docs/deploy.md#render) (Blueprint: `render.yaml` included)
+- [Fly.io](docs/deploy.md#flyio) (`fly.toml` included)
 - [Docker](#docker)
-- [Render](docs/deploy.md#render)
-- [Fly.io](docs/deploy.md#flyio)
 - [VPS + Systemd](docs/deploy.md#vps--systemd)
 - [Cloudflare Tunnel](docs/deploy.md#cloudflare-tunnel)
 
@@ -264,6 +264,56 @@ All tools are read-only unless noted otherwise.
 | `vento_run_action` | **Execute** an action card ⚠️ | Control pumps, motors, GPIO, send alerts |
 | `vento_send_to_agent` | Send message to Vento AI agent | Trigger automation flows using natural language |
 
+Every tool accepts an optional `instance` argument to target a specific Vento
+instance when `VENTO_INSTANCES` is configured (see below).
+
+## Production Features
+
+### Tool permissions (read-only mode)
+
+```env
+# Allowlist specific tools (unset = all)
+ALLOWED_TOOLS=vento_list_boards,vento_get_board,vento_get_card_value
+
+# Or just hide destructive tools (vento_run_action)
+ALLOW_DESTRUCTIVE_TOOLS=false
+```
+
+Blocked tools are removed from discovery *and* rejected at execution — a
+client that skips `tools/list` still can't call them.
+
+### Multiple Vento instances
+
+```env
+VENTO_INSTANCES={"staging":{"url":"https://staging.vento.example.com","token":"tok"}}
+```
+
+The primary instance (`VENTO_API_URL`) is always available as `default`.
+Claude can then say: *"compare the temperature on production and staging"* —
+each tool call routes via its `instance` argument.
+
+### Observability
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Readiness: pings Vento, reports `latencyMs` (503 when degraded) |
+| `GET /health/live` | Liveness: cheap, no upstream calls |
+| `GET /metrics` | Prometheus metrics (bearer-auth protected) |
+| `GET /info` | Server version, instances, exposed tools with danger levels |
+
+Metrics include request duration histograms, Vento API call counters,
+per-tool execution counters, auth failures, rate-limited requests, and cache
+hit/miss. Every HTTP response carries an `X-Request-Id` that appears in all
+correlated log lines.
+
+### Rate limiting & caching
+
+- Per-token rate limiting: `RATE_LIMIT_REQUESTS_PER_MINUTE` (default 60) plus
+  `RATE_LIMIT_BURST_PER_SECOND` (default 10). Clients are keyed by token hash.
+- Board reads are cached for `CACHE_TTL_SECONDS` (default 30) and invalidated
+  automatically when an action executes on that board. Live sensor reads are
+  never cached.
+
 ## Security
 
 ⚠️ **Important**: This connector controls real physical devices. Use with caution.
@@ -282,11 +332,10 @@ All tools are read-only unless noted otherwise.
 
 ### Permissions
 
-- By default, Claude can execute ANY action in your Vento boards
-- To limit actions per conversation, you can:
-  1. Create a read-only Vento instance for testing
-  2. Use separate connectors with different permissions
-  3. Implement tool filtering middleware (coming soon)
+- Use `ALLOW_DESTRUCTIVE_TOOLS=false` for read-only deployments
+- Use `ALLOWED_TOOLS` to expose only specific tools
+- Bearer comparison is timing-safe; auth failures are counted in `/metrics`
+- Rate limiting is on by default (per-token, with burst control)
 
 ### Best Practices
 

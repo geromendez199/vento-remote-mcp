@@ -1,0 +1,64 @@
+{
+  "board": {
+    "id": "casa",
+    "name": "Casa",
+    "description": "Smart home dashboard: sensors and controls for the whole house",
+    "cards": [
+      {
+        "id": "temperatura",
+        "type": "value",
+        "name": "Temperatura Living",
+        "unit": "°C",
+        "source": "mqtt://sensors/living/temperature"
+      },
+      {
+        "id": "luz_ambiente",
+        "type": "value",
+        "name": "Luz Ambiente",
+        "unit": "lux",
+        "source": "mqtt://sensors/living/light"
+      },
+      {
+        "id": "puerta_entrada",
+        "type": "value",
+        "name": "Puerta de Entrada",
+        "unit": "state",
+        "source": "mqtt://sensors/door/front"
+      },
+      {
+        "id": "prender_luz",
+        "type": "action",
+        "name": "Prender Luz",
+        "params": {
+          "state": { "type": "string", "enum": ["on", "off"] }
+        },
+        "target": "mqtt://actuators/living/light"
+      },
+      {
+        "id": "abrir_puerta",
+        "type": "action",
+        "name": "Abrir Puerta",
+        "params": {},
+        "target": "mqtt://actuators/door/front"
+      },
+      {
+        "id": "activar_alarma",
+        "type": "action",
+        "name": "Activar Alarma",
+        "params": {
+          "mode": { "type": "string", "enum": ["home", "away", "off"] }
+        },
+        "target": "mqtt://actuators/alarm"
+      }
+    ]
+  },
+  "agent": {
+    "name": "asistente-casa",
+    "description": "House assistant agent: observes sensors and optimizes comfort and energy",
+    "rules": [
+      "Never unlock the front door without explicit human confirmation",
+      "Keep temperature between 18°C and 24°C",
+      "Turn off lights when ambient light exceeds 400 lux"
+    ]
+  }
+}

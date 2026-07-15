@@ -27,6 +27,16 @@ const envSchema = z.object({
   OAUTH_CLIENT_ID: z.string().optional(),
   OAUTH_CLIENT_SECRET: z.string().optional(),
   OAUTH_REDIRECT_URI: z.string().url().optional(),
+  RATE_LIMIT_BURST_PER_SECOND: z.coerce.number().int().positive().default(10),
+  CACHE_TTL_SECONDS: z.coerce.number().int().nonnegative().default(30),
+  ALLOWED_TOOLS: z.string().optional(),
+  ALLOW_DESTRUCTIVE_TOOLS: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional()
+    .default("true"),
+  CORS_ORIGINS: z.string().optional(),
+  VENTO_INSTANCES: z.string().optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;
@@ -49,4 +59,8 @@ export function getConfig(): Config {
 
 export function validateConfig(): void {
   getConfig();
+}
+
+export function resetConfigForTests(): void {
+  config = null;
 }

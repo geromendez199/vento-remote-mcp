@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: vento-remote-mcp
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health/live
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: MCP_TRANSPORT
+        value: http
+      - key: MCP_AUTH_TOKEN
+        generateValue: true
+      - key: VENTO_API_URL
+        sync: false
+      - key: VENTO_TOKEN
+        sync: false
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_REQUESTS_PER_MINUTE
+        value: "60"

@@ -8,17 +8,31 @@ import {
   VentoError as VentoErrorClass,
 } from "./types.js";
 import { Logger } from "pino";
+import { TtlCache } from "../cache.js";
+import { getMetrics } from "../observability/metrics.js";
+
+const REQUEST_TIMEOUT_MS = 15_000;
+
+export interface VentoClientOptions {
+  baseUrl?: string;
+  token?: string;
+  cacheTtlMs?: number;
+}
 
 export class VentoClient {
   private baseUrl: string;
   private token: string;
   private logger: Logger;
+  private cache: TtlCache<unknown>;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, options: VentoClientOptions = {}) {
     const config = getConfig();
-    this.baseUrl = config.VENTO_API_URL.replace(/\/$/, "");
-    this.token = config.VENTO_TOKEN;
+    this.baseUrl = (options.baseUrl ?? config.VENTO_API_URL).replace(/\/$/, "");
+    this.token = options.token ?? config.VENTO_TOKEN;
     this.logger = logger;
+    this.cache = new TtlCache<unknown>(
+      options.cacheTtlMs ?? config.CACHE_TTL_SECONDS * 1000
+    );
   }
 
   private async request<T>(
@@ -35,16 +49,19 @@ export class VentoClient {
     const fetchOptions: RequestInit = {
       method,
       headers,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     };
 
     if (body) {
       fetchOptions.body = JSON.stringify(body);
     }
 
+    const metrics = getMetrics();
     try {
       const response = await fetch(url, fetchOptions);
 
       if (!response.ok) {
+        metrics.ventoApiCalls.labels(endpoint, "http_error").inc();
         const errorData = await response.json().catch(() => ({}));
         throw new VentoErrorClass(
           `Vento API error: ${response.status} ${response.statusText}`,
@@ -53,11 +70,13 @@ export class VentoClient {
         );
       }
 
+      metrics.ventoApiCalls.labels(endpoint, "success").inc();
       return (await response.json()) as T;
     } catch (error) {
       if (error instanceof VentoErrorClass) {
         throw error;
       }
+      metrics.ventoApiCalls.labels(endpoint, "network_error").inc();
       throw new VentoErrorClass(
         `Failed to connect to Vento API at ${url}`,
         undefined,
@@ -66,10 +85,36 @@ export class VentoClient {
     }
   }
 
+  private async cachedRequest<T>(cacheKey: string, fn: () => Promise<T>): Promise<T> {
+    const metrics = getMetrics();
+    const hit = this.cache.get(cacheKey);
+    if (hit !== undefined) {
+      metrics.cacheHits.inc();
+      return hit as T;
+    }
+    metrics.cacheMisses.inc();
+    const value = await fn();
+    this.cache.set(cacheKey, value);
+    return value;
+  }
+
+  // Lightweight connectivity probe used by the /health endpoint.
+  async ping(): Promise<{ connected: boolean; latencyMs: number }> {
+    const start = Date.now();
+    try {
+      await this.request<unknown>("GET", "/api/boards/v1");
+      return { connected: true, latencyMs: Date.now() - start };
+    } catch {
+      return { connected: false, latencyMs: Date.now() - start };
+    }
+  }
+
   async listBoards(): Promise<Board[]> {
     try {
-      const boards = await this.request<Board[]>("GET", "/api/boards/v1");
-      this.logger.debug({ boards }, "Listed boards");
+      const boards = await this.cachedRequest("boards:list", () =>
+        this.request<Board[]>("GET", "/api/boards/v1")
+      );
+      this.logger.debug({ count: boards.length }, "Listed boards");
       return boards;
     } catch (error) {
       this.logger.error(
@@ -82,11 +127,10 @@ export class VentoClient {
 
   async getBoard(boardId: string): Promise<Board> {
     try {
-      const board = await this.request<Board>(
-        "GET",
-        `/api/boards/v1/${boardId}`
+      const board = await this.cachedRequest(`boards:${boardId}`, () =>
+        this.request<Board>("GET", `/api/boards/v1/${encodeURIComponent(boardId)}`)
       );
-      this.logger.debug({ boardId, board }, "Retrieved board");
+      this.logger.debug({ boardId }, "Retrieved board");
       return board;
     } catch (error) {
       this.logger.error({ error, boardId }, "Failed to get board");
@@ -96,11 +140,12 @@ export class VentoClient {
 
   async getCardValue(boardId: string, cardId: string): Promise<ValueCard> {
     try {
+      // Card values are live sensor reads: never cached
       const card = await this.request<ValueCard>(
         "GET",
-        `/api/boards/v1/${boardId}/cards/${cardId}`
+        `/api/boards/v1/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}`
       );
-      this.logger.debug({ boardId, cardId, card }, "Retrieved card value");
+      this.logger.debug({ boardId, cardId }, "Retrieved card value");
       return card;
     } catch (error) {
       this.logger.error(
@@ -119,13 +164,13 @@ export class VentoClient {
     try {
       const result = await this.request<{ success: boolean; result?: unknown }>(
         "POST",
-        `/api/boards/v1/${boardId}/actions/${cardId}`,
+        `/api/boards/v1/${encodeURIComponent(boardId)}/actions/${encodeURIComponent(cardId)}`,
         { params }
       );
-      this.logger.info(
-        { boardId, cardId, params, result },
-        "Action executed"
-      );
+      // Actions mutate board state: drop cached reads for this board
+      this.cache.delete("boards:list");
+      this.cache.deletePrefix(`boards:${boardId}`);
+      this.logger.info({ boardId, cardId, params }, "Action executed");
       return result;
     } catch (error) {
       this.logger.error({ error, boardId, cardId }, "Failed to run action");
@@ -136,7 +181,7 @@ export class VentoClient {
   async listDevices(): Promise<Device[]> {
     try {
       const devices = await this.request<Device[]>("GET", "/api/devices/v1");
-      this.logger.debug({ devices }, "Listed devices");
+      this.logger.debug({ count: devices.length }, "Listed devices");
       return devices;
     } catch (error) {
       this.logger.error(
@@ -150,7 +195,7 @@ export class VentoClient {
   async listAgents(): Promise<Agent[]> {
     try {
       const agents = await this.request<Agent[]>("GET", "/api/agents/v1");
-      this.logger.debug({ agents }, "Listed agents");
+      this.logger.debug({ count: agents.length }, "Listed agents");
       return agents;
     } catch (error) {
       this.logger.error(
@@ -168,13 +213,10 @@ export class VentoClient {
     try {
       const response = await this.request<AgentResponse>(
         "POST",
-        `/api/agents/v1/${agentName}/agent_input`,
+        `/api/agents/v1/${encodeURIComponent(agentName)}/agent_input`,
         { message }
       );
-      this.logger.info(
-        { agentName, message, response },
-        "Message sent to agent"
-      );
+      this.logger.info({ agentName }, "Message sent to agent");
       return response;
     } catch (error) {
       this.logger.error(
