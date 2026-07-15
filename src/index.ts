@@ -5,6 +5,7 @@ import { getConfig, validateConfig } from "./config.js";
 import { VentoClient } from "./vento/client.js";
 import { createMcpServer } from "./server.js";
 import { createAuthMiddleware, createOptionalAuthMiddleware } from "./auth.js";
+import { createOAuthRouter } from "./routes/oauth.js";
 
 const isHttpMode = process.env.MCP_TRANSPORT === "http" || !process.stdin.isTTY;
 
@@ -112,8 +113,15 @@ async function startHttpServer(): Promise<void> {
         description:
           "Remote MCP connector for Vento - AI control and automation platform",
         ventoUrl: config.VENTO_API_URL,
+        oauthEnabled: config.OAUTH_ENABLED,
       });
     });
+
+    if (config.OAUTH_ENABLED) {
+      const oauthRouter = createOAuthRouter(config);
+      app.use("/auth/vento", oauthRouter);
+      logger.info("OAuth routes enabled at /auth/vento");
+    }
 
     app.use(
       (

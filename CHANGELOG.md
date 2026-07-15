@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- OAuth 2.0 authentication flow for Vento authorization
+  - Secure token exchange without API key sharing
+  - Revocable access tokens
+  - Scoped permissions (read:boards, write:actions)
+- Railway one-click deploy button
+- OAuth documentation and setup guide
+- Quick setup guide for all deployment methods
+- `/auth/vento/authorize`, `/auth/vento/callback`, `/auth/vento/token` endpoints
+- Environment variables: `OAUTH_ENABLED`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REDIRECT_URI`
+
 ### Planned
 - OAuth 2.1 support for Anthropic directory submission
 - Tool filtering and per-conversation permissions
@@ -15,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Board state caching and subscriptions
 - Rate limiting metrics and monitoring
 - Prometheus metrics export
+- Persistent OAuth token storage with encryption
+- OAuth scope management UI
+- Token refresh before expiration
 
 ## [0.1.0] - 2024-01-15
 

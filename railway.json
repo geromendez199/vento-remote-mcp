@@ -1,0 +1,50 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "node dist/index.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 5
+  },
+  "plugins": [
+    "postgres"
+  ],
+  "variables": {
+    "PORT": {
+      "description": "Server port",
+      "value": "3000"
+    },
+    "NODE_ENV": {
+      "description": "Environment",
+      "value": "production"
+    },
+    "LOG_LEVEL": {
+      "description": "Log level (debug, info, warn, error)",
+      "value": "info"
+    },
+    "MCP_AUTH_TOKEN": {
+      "description": "Strong random token for Claude → Connector auth (32+ chars). Generate: openssl rand -hex 32",
+      "value": "",
+      "reference": ""
+    },
+    "VENTO_API_URL": {
+      "description": "Your Vento instance URL (e.g., https://vento.example.com)",
+      "value": ""
+    },
+    "VENTO_TOKEN": {
+      "description": "Vento API token (create in Vento settings)",
+      "value": ""
+    },
+    "RATE_LIMIT_ENABLED": {
+      "description": "Enable rate limiting",
+      "value": "true"
+    },
+    "RATE_LIMIT_REQUESTS_PER_MINUTE": {
+      "description": "Rate limit requests per minute",
+      "value": "60"
+    }
+  }
+}

@@ -7,6 +7,24 @@
 
 **Connect Claude, Claude Desktop, and Cursor to any Vento instance via Model Context Protocol**
 
+---
+
+### 🚀 Quick Deploy
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new?templateId=vento-remote-mcp)
+
+<details>
+<summary><b>Deploy on other platforms</b></summary>
+
+- [Railway](#railway) (1-click) ⭐ Easiest
+- [Docker](#docker)
+- [Render](docs/deploy.md#render)
+- [Fly.io](docs/deploy.md#flyio)
+- [VPS + Systemd](docs/deploy.md#vps--systemd)
+- [Cloudflare Tunnel](docs/deploy.md#cloudflare-tunnel)
+
+</details>
+
 </div>
 
 Vento Remote MCP is a production-ready remote server that bridges Claude (claude.ai, mobile app, Claude Desktop, Claude Code, and the Anthropic API) with any Vento instance (self-hosted or cloud.vento.build). It enables AI assistants to read sensor values, monitor device status, and execute real-world actions through Vento boards and agents.

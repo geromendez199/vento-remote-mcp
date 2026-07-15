@@ -109,6 +109,47 @@ npx @modelcontextprotocol/inspector npx tsx src/index.ts
 # - Monitor responses in real-time
 ```
 
+## OAuth Authorization Flow
+
+### Step 1: Initiate Authorization
+```bash
+# User clicks link or visits:
+https://your-connector.railway.app/auth/vento/authorize
+
+# Redirects to Vento login page
+```
+
+### Step 2: Grant Permissions
+- User logs into their Vento instance
+- Reviews requested scopes: `read:boards`, `write:actions`
+- Clicks "Authorize"
+
+### Step 3: Receive Session Token
+```bash
+# Redirected back to:
+https://your-connector.railway.app/auth/vento/callback?code=AUTH_CODE&state=STATE
+
+# Receives JSON response:
+{
+  "success": true,
+  "sessionId": "abc123def456...",
+  "instructions": {
+    "platform": "Claude",
+    "type": "HTTP MCP Server",
+    "url": "https://your-connector.railway.app",
+    "auth": {
+      "type": "Bearer Token",
+      "token": "abc123def456..."
+    }
+  }
+}
+```
+
+### Step 4: Configure Claude with OAuth Token
+Add to Claude settings using the `sessionId` instead of `MCP_AUTH_TOKEN`:
+- **URL**: `https://your-connector.railway.app`
+- **Auth Token**: Session ID from step 3
+
 ## Integration Examples
 
 ### With Cursor IDE

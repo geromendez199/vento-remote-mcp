@@ -19,6 +19,14 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(60),
+  OAUTH_ENABLED: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional()
+    .default("false"),
+  OAUTH_CLIENT_ID: z.string().optional(),
+  OAUTH_CLIENT_SECRET: z.string().optional(),
+  OAUTH_REDIRECT_URI: z.string().url().optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;
