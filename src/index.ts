@@ -63,7 +63,12 @@ async function startStdioServer(): Promise<void> {
 
 async function startHttpServer(): Promise<void> {
   try {
-    validateConfig();
+    try {
+      validateConfig();
+    } catch (configError) {
+      logger.error({ error: configError }, "Configuration validation failed");
+      throw configError;
+    }
     const config = getConfig();
     logger.level = config.LOG_LEVEL;
 
@@ -267,7 +272,12 @@ async function startHttpServer(): Promise<void> {
       );
     });
   } catch (error) {
-    logger.error({ error }, "Failed to bootstrap HTTP server");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { error, errorMessage, stack: error instanceof Error ? error.stack : undefined },
+      "Failed to bootstrap HTTP server"
+    );
+    console.error("Bootstrap error:", errorMessage);
     process.exit(1);
   }
 }
